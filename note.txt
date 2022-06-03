@@ -1,0 +1,10 @@
+-> bno055
+## if want to run with robot_localization ekf_node, needs to use IMU_MODE on BNO055
+
+# To start atcart8 with bno055
+ros2 launch jmoab_ros2 atcart8_imu.launch.py
+
+# To use /odom /imu/data with ekf_node
+ros2 launch jmoab_ros2 ekf.launch.py
+
+/odometry/filtered is the output from ekf_node
