@@ -525,7 +525,7 @@ class JMOAB_ATCART8(Node):
 		############################
 		### cart control command ###
 		############################
-		#### Auto mode ####
+		### Auto mode ####
 		if atcart_mode == 2:
 
 			###################################
@@ -683,7 +683,7 @@ class JMOAB_ATCART8(Node):
 				right_rpm = 0.0
 
 
-		#### Manual mode ####
+		### Manual mode ####
 		elif atcart_mode == 1:
 			## allow only velocity control in manual mode
 			## confirm the mode to be in velocity control
@@ -703,9 +703,9 @@ class JMOAB_ATCART8(Node):
 			right_rpm = 0.0
 			self.zlac8015d_set_rpm_with_limit(left_rpm, right_rpm)
 
-		###########################
-		## Odometry computation ###
-		###########################
+		##########################
+		# Odometry computation ###
+		##########################
 		self.l_meter, self.r_meter = self.zlc.get_wheels_travelled()
 		self.l_meter = self.l_meter - self.l_meter_init 
 		self.r_meter = (-1*self.r_meter) - (-1*self.r_meter_init)
