@@ -1,8 +1,11 @@
 
 import rclpy
 from rclpy.node import Node
-from std_msgs.msg import Int8MultiArray, Int16MultiArray, UInt8, Float32MultiArray
+from std_msgs.msg import Int8MultiArray, Int16MultiArray, UInt8, Float32MultiArray, Int16
 from geometry_msgs.msg import Twist
+from ament_index_python.packages import get_package_share_directory
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import SetParametersResult
 import time
 import numpy as np
 from smbus2 import SMBus
@@ -33,19 +36,47 @@ class JMOAB_ATCART_BASIC(Node):
 
 	def __init__(self):
 
-		super().__init__('jmoab_ros2_atcart_basic')
+		super().__init__('jmoab_ros2_pwmcart')
 		self.get_logger().info('Start JMOAB ROS2 node')
 
 		self.bus = SMBus(1)
+
+		##### ROS parameters
+		# self.declare_parameter('sbus_left_max_db', 1142)
+		# self.declare_parameter('sbus_right_max_db', 1151)
+		# self.declare_parameter('sbus_left_min_db', 908)
+		# self.declare_parameter('sbus_right_min_db', 902)
+		
+		self.declare_parameter('sbus_left_max_db', 1024)
+		self.declare_parameter('sbus_right_max_db', 1024)
+		self.declare_parameter('sbus_left_min_db', 1024)
+		self.declare_parameter('sbus_right_min_db', 1024)
+
+		self.declare_parameter('vx_max', 2.0)
+		self.declare_parameter('wz_max', 2.0)
+
+		self.add_on_set_parameters_callback(self.parameter_callback)
+
+		self.sbus_left_max_db = self.get_parameter('sbus_left_max_db').get_parameter_value().integer_value
+		self.sbus_right_max_db = self.get_parameter('sbus_right_max_db').get_parameter_value().integer_value
+		self.sbus_left_min_db = self.get_parameter('sbus_left_min_db').get_parameter_value().integer_value
+		self.sbus_right_min_db = self.get_parameter('sbus_right_min_db').get_parameter_value().integer_value
+		self.vx_max = self.get_parameter('vx_max').get_parameter_value().double_value
+		self.wz_max = self.get_parameter('wz_max').get_parameter_value().double_value
+
+		self.get_logger().info("Using parameters as below")
+		self.get_logger().info("sbus_left_max_db: {}".format(self.sbus_left_max_db))
+		self.get_logger().info("sbus_right_max_db: {}".format(self.sbus_right_max_db))
+		self.get_logger().info("sbus_left_min_db: {}".format(self.sbus_left_min_db))
+		self.get_logger().info("sbus_right_min_db: {}".format(self.sbus_right_min_db))
+		self.get_logger().info("vx_max: {}".format(self.vx_max))
+		self.get_logger().info("wz_max: {}".format(self.wz_max))
 
 		### Class parameters ###
 		#### cart_cmd
 		##### mixing for steering/throttle control
 		self.sbus_cmd_steering = 1024
 		self.sbus_cmd_throttle = 1024
-		self.cart_cmd_cb_timeout = 1.0 # second
-		self.cart_cmd_cb_timestamp = time.time()
-		self.cart_cmd_flag = False
 		self.prev_y = 0.0
 		self.sbus_max = 1680.0
 		self.sbus_min = 368.0
@@ -55,11 +86,15 @@ class JMOAB_ATCART_BASIC(Node):
 		self.sbus_min_backward = 968	# a value before start rotating backward
 		self.sbus_min_forward = 1093	# a value before start rotating forward
 
-		self.prev_y = 0.0
+		# self.sbus_left_max_db = 1142
+		# self.sbus_right_max_db = 1151
+
+		# self.sbus_left_min_db = 908
+		# self.sbus_right_min_db = 902
 
 		### cmd_vel
-		self.vx_max = 2.0
-		self.wz_max = 2.0
+		# self.vx_max = 2.0
+		# self.wz_max = 2.0
 		self.vx = 0.0
 		self.wz = 0.0
 		self.cmd_vel_cb_flag = False
@@ -87,6 +122,7 @@ class JMOAB_ATCART_BASIC(Node):
 		self.pwm_max = 1920
 		self.pwm_mid = 1520
 		self.servo_list = []
+		self.servo_pwm = 1520
 
 		#### led cmd
 		self.led_cb_flag = False
@@ -116,7 +152,7 @@ class JMOAB_ATCART_BASIC(Node):
 		self.get_logger().info('Subscribing on /jmoab/wheels_cmd [std_msgs/msg/Float32MultiArray] ex: [30.0, -50.0] percentages -100.0 to 100.0 ranges')
 		self.get_logger().info('Subscribing on /jmoab/cart_mode_cmd [std_msgs/msg/UInt8]  ex: 0=hold, 1=manual, 2=auto')
 		self.get_logger().info('Subscribing on /jmoab/relays [std_msgs/msg/Int8MultiArray]  ex: [1,1] on both relays')
-		self.get_logger().info('Subscribing on /jmoab/servos [std_msgs/msg/Int16MultiArray]  ex: [19200, 1120, 1520] ')
+		self.get_logger().info('Subscribing on /jmoab/servo [std_msgs/msg/Int16]  ex: 1120-1520-1920 ranges ')
 		# self.get_logger().info('Subscribing on /jmoab/led [std_msgs/msg/UInt8MultiArray]')
 
 		### Uncomment this if want to turn off propo in auto mode ###
@@ -128,7 +164,27 @@ class JMOAB_ATCART_BASIC(Node):
 
 	#######################################	
 	############ ROS callbacks ############
-	#######################################	
+	#######################################
+	def parameter_callback(self, params):
+		for param in params:
+			# print(param.name, param.type_)
+			if (param.name == 'sbus_left_max_db') and (param.type_ == Parameter.Type.INTEGER):
+				self.sbus_left_max_db = param.value
+			elif (param.name == 'sbus_right_max_db') and (param.type_ == Parameter.Type.INTEGER):
+				self.sbus_right_max_db = param.value
+			elif (param.name == 'sbus_left_min_db') and (param.type_ == Parameter.Type.INTEGER):
+				self.sbus_left_min_db = param.value
+			elif (param.name == 'sbus_right_min_db') and (param.type_ == Parameter.Type.INTEGER):
+				self.sbus_right_min_db = param.value
+			elif (param.name == 'vx_max') and (param.type_ == Parameter.Type.DOUBLE):
+				self.vx_max = param.value
+			elif (param.name == 'wz_max') and (param.type_ == Parameter.Type.DOUBLE):
+				self.wz_max = param.value
+
+		self.get_logger().info("Updated parameter")
+
+		return SetParametersResult(successful=True)
+
 	def cmd_vel_callback(self, msg):
 		if msg.linear.x > self.vx_max:
 			vx = self.vx_max
@@ -181,7 +237,7 @@ class JMOAB_ATCART_BASIC(Node):
 
 	def servo_cmd_callback(self, msg):
 		self.servo_cb_flag = True
-		self.servo_list = msg.data
+		self.servo_pwm = msg.data
 
 	# def led_cmd_callback(self, msg):
 	# 	self.led_cb_flag = True
@@ -302,7 +358,7 @@ class JMOAB_ATCART_BASIC(Node):
 			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM1_H, pwm_bytes)
 		elif servo_id == 1:
 			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM2_H, pwm_bytes)
-		if servo_id == 2:
+		elif servo_id == 2:
 			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM3_H, pwm_bytes)
 
 	# def write_led(self, led_list):
@@ -359,16 +415,16 @@ class JMOAB_ATCART_BASIC(Node):
 	def wheels_percent_to_wheels_sbus(self, left_per, right_per):
 
 		if left_per > 0.0:
-			left_sbus = self.map(left_per, 0.0, 200.0, self.sbus_min_forward, self.sbus_max)
+			left_sbus = self.map(left_per, 0.0, 200.0, self.sbus_left_max_db, self.sbus_max)
 		elif left_per < 0.0:
-			left_sbus = self.map(left_per, -200.0, 0.0, self.sbus_min, self.sbus_min_backward)
+			left_sbus = self.map(left_per, -200.0, 0.0, self.sbus_min, self.sbus_left_min_db)
 		else:
 			left_sbus = 1024
 
 		if right_per > 0.0:
-			right_sbus = self.map(right_per, 0.0, 200.0, self.sbus_min_forward, self.sbus_max)
+			right_sbus = self.map(right_per, 0.0, 200.0, self.sbus_right_max_db, self.sbus_max)
 		elif right_per < 0.0:
-			right_sbus = self.map(right_per, -200.0, 0.0, self.sbus_min, self.sbus_min_backward)
+			right_sbus = self.map(right_per, -200.0, 0.0, self.sbus_min, self.sbus_right_min_db)
 		else:
 			right_sbus = 1024
 
@@ -471,7 +527,8 @@ class JMOAB_ATCART_BASIC(Node):
 		### servo command ###
 		#####################
 		if self.servo_cb_flag:
-			self.write_servo(self.servo_list)
+			cmd_pwm = self.over_limit_check(self.servo_pwm)
+			self.write_pwm_bytes(2, cmd_pwm)
 			self.servo_cb_flag = False
 
 		###################

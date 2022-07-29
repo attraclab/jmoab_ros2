@@ -131,11 +131,11 @@ class JMOAB_BNO055(Node):
 
 		self.gps_sub = self.create_subscription(NavSatFix, 'ublox/fix', self.gps_callback, 10)
 		self.sbus_rc_ch_sub = self.create_subscription(UInt16MultiArray, 'jmoab/sbus_rc_ch', self.sbus_rc_callback, 10)
-		self.cart_mode_sub = self.create_subscription(UInt8, 'jmoab/atcart_mode', self.cart_mode_callback, 10)
-		self.cart_cmd_sub = self.create_subscription(UInt16MultiArray, 'jmoab/cart_cmd', self.cart_cmd_callback, 10)
+		self.cart_mode_sub = self.create_subscription(UInt8, 'jmoab/cart_mode', self.cart_mode_callback, 10)
+		# self.cart_cmd_sub = self.create_subscription(UInt16MultiArray, 'jmoab/cart_cmd', self.cart_cmd_callback, 10)
 		
-		self.get_logger().info('Publishing to jmoab/ahrs [std_msgs/msg/Float32MultiArray]')
-		self.get_logger().info('Publishing to imu/data [sensor_msgs/msg/Imu]')
+		self.get_logger().info('Publishing to /jmoab/ahrs [std_msgs/msg/Float32MultiArray]')
+		self.get_logger().info('Publishing to /imu/data [sensor_msgs/msg/Imu]')
 
 		### Loop spin ###
 		timer_period = 0.01
@@ -144,9 +144,9 @@ class JMOAB_BNO055(Node):
 	#######################################	
 	############ ROS callbacks ############
 	#######################################	
-	def cart_cmd_callback(self, msg):
-		self.sbus_cmd_steering = msg.data[0]
-		self.sbus_cmd_throttle = msg.data[1]
+	# def cart_cmd_callback(self, msg):
+	# 	self.sbus_cmd_steering = msg.data[0]
+	# 	self.sbus_cmd_throttle = msg.data[1]
 
 	def sbus_rc_callback(self, msg):
 		self.sbus_steering_stick = msg.data[0]
@@ -427,13 +427,14 @@ class JMOAB_BNO055(Node):
 				## we do estimation only when sbus throttle is high, ##
 				## and sbus steering is no curvy                     ##
 				#######################################################
-				if (self.sbus_cmd_throttle > 1090) and (970 < self.sbus_cmd_steering < 1074):
-					self.do_estimation = True
-				else:
-					self.last_time_manual_cal = time.time()
-					self.last_time_auto_cal = time.time()
-					self.cal_offset = False
-					self.do_estimation = False
+				# if (self.sbus_cmd_throttle > 1090) and (970 < self.sbus_cmd_steering < 1074):
+				# 	self.do_estimation = True
+				# else:
+				# 	self.last_time_manual_cal = time.time()
+				# 	self.last_time_auto_cal = time.time()
+				# 	self.cal_offset = False
+				# 	self.do_estimation = False
+				pass
 			else:
 				self.last_time_manual_cal = time.time()
 				self.last_time_auto_cal = time.time()

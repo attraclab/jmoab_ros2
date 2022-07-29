@@ -5,7 +5,7 @@
   <version>0.0.1</version>
   <description>This is a python package of AT_JMOAB in ROS2</description>
   <maintainer email="rasheedo.kit@gmail.com">rasheed</maintainer>
-  <license>GPLv3</license>
+  <license>MIT</license>
 
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>

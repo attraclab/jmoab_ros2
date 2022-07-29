@@ -195,8 +195,8 @@ class JMOAB_ATCART8(Node):
 		# 		('max_rpm', self.max_rpm)
 		# 	]
 		# )
-		self.declare_parameter('base_width')
-		self.declare_parameter('max_rpm')
+		self.declare_parameter('base_width', self.L)
+		self.declare_parameter('max_rpm', self.max_rpm)
 		param_base_width = Parameter('base_width', Parameter.Type.DOUBLE, self.L)
 		param_max_rpm = Parameter('max_rpm', Parameter.Type.INTEGER, self.max_rpm)
 		self.set_parameters([param_base_width, param_max_rpm])

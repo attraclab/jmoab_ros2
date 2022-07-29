@@ -8,3 +8,7 @@ ros2 launch jmoab_ros2 atcart8_imu.launch.py
 ros2 launch jmoab_ros2 ekf.launch.py
 
 /odometry/filtered is the output from ekf_node
+
+sudo pip3 install smbus2
+sudo apt install ros-galactic-tf-transformations
+sudo pip3 install transforms3d
