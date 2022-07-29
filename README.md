@@ -261,3 +261,23 @@ source /opt/ros/foxy/setup.bash
 ros2 launch nmea_navsat_driver nmea_serial_driver.launch.py
 ```
 
+## Robot Localization
+
+In order to have a better odometry, you will to use [robot_localization package](http://docs.ros.org/en/noetic/api/robot_localization/html/index.html) to fuse the `atcart8/odom` with `/imu/data` topics.
+
+Install the package,
+`sudo apt install ros-foxy-robot-localization`
+
+The config file is in [jmoab_ros2/config/ekf.yaml](https://github.com/attraclab/jmoab_ros2/blob/master/config/ekf.yaml) which is following [the explanation from original developer](http://docs.ros.org/en/noetic/api/robot_localization/html/configuring_robot_localization.html).
+
+Then you can launch as,
+
+```sh
+# Terminal 1
+ros2 launch jmoab_ros2 atcart8_imu.launch.py
+
+# Terminal 2
+ros2 launch jmoab_ros2 ekf.launch.py
+```
+
+or you can try to wrap this up into one launch file in your project.
