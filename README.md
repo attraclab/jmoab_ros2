@@ -134,7 +134,7 @@ It is necessary to know that how much of lowest speed each left/right motors can
 
 Then from RC transmitter (ch.5) switch to auto mode.
 
-On `pwmcart` node termnial you will log info every 1 second printing
+On `pwmcart` node termnial you will see log info every 1 second printing
 
 ```
 [INFO] [1659088017.413651126] [jmoab_ros2_pwmcart]: vx: 0.00 wz: 0.00 left: 0.00 right: 0.00 x: 0.00 y: 0.00 l_sbus: 1024 r_sbus: 1024
@@ -168,5 +168,22 @@ You will need to install this [additiona python package](https://github.com/rash
 
 ATCart8 is not related JMOAB directly, but in case of some application which requires JMOAB then you can use this as well. 
 
+You will need to make a udev rules, if you're using many USB serial ports in the same time, so in this case I made the USB-RS485 serial port as `/dev/usb_rs485`, so if you're using different name, you have to change it on [this line](https://github.com/attraclab/jmoab_ros2/blob/60af19e06cf2aa8087f8a06c9f12971f9462d050/jmoab_ros2/atcart8.py#L119).
 
+### publish
 
+- `/jmoab/sbus_rc_ch` as std_msgs/msg/Int16MultiArray, sbus value of RC transmitter's channels
+- `/jmoab/cart_mode` as std_msgs/msg/UInt8, 0: hold, 1: manual, 2: auto modes
+- `/jmoab/adc` as std_msgs/msg/Float32MultiArray, ADC value in 12bits maximum voltage is 40.96V
+- `/jmoab/wheels_rpm` as std_msg/msg/Float32MultiArray, this is feedback RPM from ZLAC8015D driver [left_rpm, right_rpm].
+- `/atcart8/odom` as nav_msgs/msg/Odometry, this is raw odometry from wheel's encoder calculation, you will need EKF node to run together to have better odometry.
+
+### subscribe
+
+- `/cmd_vel` as geometry_msgs/msg/Twist, you can consider linear.x as throttle (go straight), and angular.z as steering (turning). 
+- `/jmoab/cart_rpm_cmd` as std_msgs/msg/Int16MultiArray, this is wheel's RPM control. 
+- `/jmoab/cart_deg_cmd` as std_msgs/msg/Int16MultiArray, this is wheel's angle (degree) control, you only need to send one time (not continuously like cmd_vel).
+- `/jmoab/cart_dist_cmd` as std_msgs/msg/Int16MultiArray, this is wheel's distance (meters) control, you only need to send one time (not continuously like cmd_vel).
+- `/jmoab/cart_mode_cmd` as std_msgs/msg/UInt8, this allow you to change cart mode programmatically; 0: hold, 1: manual, 2: auto modes
+- `/jmoab/relays` as std_msgs/msg/Int8MultiArray, you can control relays ON/OFF; ex. [1,0] relay1 on relay2 off.
+- `/jmoab/servo` as std_msgs/msg/Int16, you can control only one servo motor by pwm value; ex. in 1120-1520-1920 ranges.
