@@ -186,4 +186,78 @@ You will need to make a udev rules, if you're using many USB serial ports in the
 - `/jmoab/cart_dist_cmd` as std_msgs/msg/Int16MultiArray, this is wheel's distance (meters) control, you only need to send one time (not continuously like cmd_vel).
 - `/jmoab/cart_mode_cmd` as std_msgs/msg/UInt8, this allow you to change cart mode programmatically; 0: hold, 1: manual, 2: auto modes
 - `/jmoab/relays` as std_msgs/msg/Int8MultiArray, you can control relays ON/OFF; ex. [1,0] relay1 on relay2 off.
-- `/jmoab/servo` as std_msgs/msg/Int16, you can control only one servo motor by pwm value; ex. in 1120-1520-1920 ranges.
+- `/jmoab/servos` as std_msgs/msg/Int16MultiArray, you can control servo motors by pwm value; ex. [1920, 1120, 1520] servo1 is high, servo2 is low, servo3 is neutral.
+
+
+# Third party packages.
+
+## JMOAB with F9P GPS
+
+GPS port on JMOAB is connected to pin 8 and 10 of Jetson J41 header and recognized as `/dev/ttyTHS1` (UART_2).
+
+In order to enable this port to use as regular user, please check on this [link](https://forums.developer.nvidia.com/t/read-write-permission-ttyths1/81623/6
+) or following the step below.
+
+- We will need to disable nvgetty
+	```
+	sudo systemctl stop nvgetty
+	sudo systemctl disable nvgetty
+	```
+- Create a udev rule for ttyTHS* to get permission (without sudo)
+
+	`sudo vim  /etc/udev/rules.d/55-tegraserial.rules`
+	
+- put this content on created udev rule file
+	`KERNEL=="ttyTHS*", MODE="0666"`
+	
+- reload rules and reboot
+	```
+	sudo udevadm control --reload-rules
+	sudo reboot
+	```
+
+Then you are able to use `/dev/ttyTHS1` for GPS now.
+
+I recommend to use [nmea_navsat_driver package](https://github.com/ros-drivers/nmea_navsat_driver/tree/ros2), so you will need to
+
+```sh
+cd ~/dev_ws/src/
+git clone https://github.com/ros-drivers/nmea_navsat_driver.git
+cd nmea_navsat_driver
+git checkout ros2
+```
+
+You will need to edit the params file at [nmea_navsat_driver/config/nmea_serial_driver.yaml](https://github.com/ros-drivers/nmea_navsat_driver.git), and change to as content below,
+
+```
+nmea_navsat_driver:
+  ros__parameters:
+    port: "/dev/ttyTHS1"
+    baud: 115200
+    frame_id: "gps"
+    time_ref_source: "gps"
+    useRMC: False
+```
+
+Build the package,
+
+```sh
+cd ~/dev_ws
+colcon build --symlink-install --packages-select nmea_navsat_driver
+```
+
+Make a symlink manually in case you change something on params file later,
+
+```sh
+cd ~/dev_ws/install/nmea_navsat_driver/share/nmea_navsat_driver/config
+ln -s ~/dev_ws/src/nmea_navsat_driver/config/nmea_serial_driver.yaml nmea_serial_driver.yaml 
+```
+
+Launch the file,
+
+```sh
+cd 
+source /opt/ros/foxy/setup.bash
+ros2 launch nmea_navsat_driver nmea_serial_driver.launch.py
+```
+
