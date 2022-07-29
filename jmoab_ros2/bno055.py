@@ -129,7 +129,7 @@ class JMOAB_BNO055(Node):
 		self.ahrs_msg = Float32MultiArray()
 		self.imu_msg = Imu()
 
-		self.gps_sub = self.create_subscription(NavSatFix, 'ublox/fix', self.gps_callback, 10)
+		self.gps_sub = self.create_subscription(NavSatFix, '/fix', self.gps_callback, 10)
 		self.sbus_rc_ch_sub = self.create_subscription(UInt16MultiArray, 'jmoab/sbus_rc_ch', self.sbus_rc_callback, 10)
 		self.cart_mode_sub = self.create_subscription(UInt8, 'jmoab/cart_mode', self.cart_mode_callback, 10)
 		# self.cart_cmd_sub = self.create_subscription(UInt16MultiArray, 'jmoab/cart_cmd', self.cart_cmd_callback, 10)

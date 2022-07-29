@@ -92,6 +92,8 @@ class JMOAB_ATCART_BASIC(Node):
 		# self.sbus_left_min_db = 908
 		# self.sbus_right_min_db = 902
 
+		self.last_stamp_log = time.time()
+
 		### cmd_vel
 		# self.vx_max = 2.0
 		# self.wz_max = 2.0
@@ -500,14 +502,20 @@ class JMOAB_ATCART_BASIC(Node):
 				x_percent = 0.0
 				y_percent = 0.0
 
-			print("vx: {:.2f} wz: {:.2f} left: {:.2f} right: {:.2f} x: {:.2f} y: {:.2f} l_sbus: {:d} r_sbus: {:d}".format(\
-				self.vx, self.wz, self.left_percent, self.right_percent, x_percent, y_percent, int(left_sbus), int(right_sbus)))
+			if time.time() - self.last_stamp_log > 1.0:
+				self.get_logger().info("vx: {:.2f} wz: {:.2f} left: {:.2f} right: {:.2f} x: {:.2f} y: {:.2f} l_sbus: {:d} r_sbus: {:d}".format(\
+					self.vx, self.wz, self.left_percent, self.right_percent, x_percent, y_percent, int(left_sbus), int(right_sbus)))
+				self.last_stamp_log = time.time()
 
 
 		elif atcart_mode == 0:
 			self.write_left_right(1024, 1024)
 			self.cmd_vel_cb_flag = False
 			self.wheels_cmd_cb_flag = False
+			self.last_stamp_log = time.time()
+
+		else:
+			self.last_stamp_log = time.time()
 
 		#########################
 		### cart mode command ###

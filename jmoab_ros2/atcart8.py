@@ -3,7 +3,7 @@ import rclpy
 from rclpy.node import Node
 from rclpy.parameter import Parameter
 from rcl_interfaces.msg import SetParametersResult
-from std_msgs.msg import UInt8MultiArray, UInt16MultiArray, UInt8, Float32MultiArray, Int16MultiArray
+from std_msgs.msg import Int8MultiArray, UInt8, Float32MultiArray, Int16MultiArray
 from nav_msgs.msg import Odometry
 from geometry_msgs.msg import Twist
 from geometry_msgs.msg import TransformStamped
@@ -15,8 +15,8 @@ from smbus2 import SMBus
 from zlac8015d import ZLAC8015D
 
 ## i2c's Address
-JMOAB_RELAY_ADDR = 0x70
-JMOAB_MAIN_ADDR = 0x71
+JMOAB_I2C_ADDR1 = 0x70
+JMOAB_I2C_ADDR2 = 0x71
 
 ## i2c's register
 RY1 = 0x00
@@ -27,6 +27,13 @@ CARTIF_SBUS_CH1_H = 0x30
 CARTIF_INPUT_SELECT = 0x52
 AUX_LED1 = 0x54
 DISABLE_SBUS_FAILSAFE = 0x57
+
+HOLD = 0x00
+MAN = 0x01
+AUTO = 0x02
+
+ENA_FS = 0x00
+DIS_FS = 0x01
 
 ZLAC_VEL_MODE = 3
 ZLAC_POS_MODE = 1
@@ -47,9 +54,9 @@ class JMOAB_ATCART8(Node):
 		##### mixing for steering/throttle control
 		self.cmd_sbus_steering = 1024
 		self.cmd_sbus_throttle = 1024
-		self.cart_sbus_cmd_cb_timeout = 1.0 # second
-		self.cart_sbus_cmd_cb_timestamp = time.time()
-		self.cart_sbus_cmd_flag = False
+		# self.cart_sbus_cmd_cb_timeout = 1.0 # second
+		# self.cart_sbus_cmd_cb_timestamp = time.time()
+		# self.cart_sbus_cmd_flag = False
 		self.prev_y = 0.0
 		self.sbus_max = 1680.0
 		self.sbus_min = 368.0
@@ -135,46 +142,46 @@ class JMOAB_ATCART8(Node):
 		###############
 		### Pub/Sub ###
 		###############
-		self.sbus_rc_pub = self.create_publisher(UInt16MultiArray, 'jmoab/sbus_rc_ch', 10)
-		self.atcart_mode_pub = self.create_publisher(UInt8, 'jmoab/atcart_mode', 10)
+		self.sbus_rc_pub = self.create_publisher(Int16MultiArray, 'jmoab/sbus_rc_ch', 10)
+		self.atcart_mode_pub = self.create_publisher(UInt8, 'jmoab/cart_mode', 10)
 		self.adc_pub = self.create_publisher(Float32MultiArray, 'jmoab/adc', 10)
 		self.wheels_rpm_pub = self.create_publisher(Float32MultiArray, 'jmoab/wheels_rpm', 10)
 		self.odom_pub = self.create_publisher(Odometry, 'atcart8/odom', 10)
 		# self.odom_pub = self.create_publisher(Odometry, '/odom', 10)
 
-		self.sbus_rc_msg = UInt16MultiArray()
+		self.sbus_rc_msg = Int16MultiArray()
 		self.atcart_mode_msg = UInt8()
 		self.adc_msg = Float32MultiArray()
 		self.wheels_rpm_msg = Float32MultiArray()
 		self.odom_msg = Odometry()
 
-		self.cart_sbus_cmd_sub = self.create_subscription(UInt16MultiArray, 'jmoab/cart_cmd', self.cart_sbus_cmd_callback, 10)
+		# self.cart_sbus_cmd_sub = self.create_subscription(Int16MultiArray, 'jmoab/cart_cmd', self.cart_sbus_cmd_callback, 10)
 		self.cart_rpm_cmd_sub = self.create_subscription(Int16MultiArray, 'jmoab/cart_rpm_cmd', self.cart_rpm_cmd_callback, 10)
 		self.cart_deg_cmd_sub = self.create_subscription(Int16MultiArray, 'jmoab/cart_deg_cmd', self.cart_deg_cmd_callback, 10)
 		self.cart_dist_cmd_sub = self.create_subscription(Float32MultiArray, 'jmoab/cart_dist_cmd', self.cart_dist_cmd_callback, 10)
-		self.atcart_mode_cmd_sub = self.create_subscription(UInt8, 'jmoab/atcart_mode_cmd', self.atcart_mode_cmd_callback, 10)
-		self.relay_sub = self.create_subscription(UInt8MultiArray, 'jmoab/relay', self.relay_cmd_callback, 10)
-		self.servo_sub = self.create_subscription(UInt16MultiArray, 'jmoab/servo', self.servo_cmd_callback, 10)
-		self.led_sub = self.create_subscription(UInt8MultiArray, 'jmoab/led', self.led_cmd_callback, 10)
+		self.atcart_mode_cmd_sub = self.create_subscription(UInt8, 'jmoab/cart_mode_cmd', self.atcart_mode_cmd_callback, 10)
+		self.relay_sub = self.create_subscription(Int8MultiArray, 'jmoab/relays', self.relay_cmd_callback, 10)
+		self.servo_sub = self.create_subscription(Int16MultiArray, 'jmoab/servos', self.servo_cmd_callback, 10)
+		# self.led_sub = self.create_subscription(Int8MultiArray, 'jmoab/led', self.led_cmd_callback, 10)
 		self.cmd_vel_sub = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
 
-		self.get_logger().info('Publishing to jmoab/sbus_rc_ch [std_msgs/msg/UInt16MultiArray]')
-		self.get_logger().info('Publishing to jmoab/atcart_mode [std_msgs/msg/UInt8]')
-		self.get_logger().info('Publishing to jmoab/adc [std_msgs/msg/Float32MultiArray]')
-		self.get_logger().info('Subscribing on jmoab/atcart_mode_cmd [std_msgs/msg/UInt8]')
-		self.get_logger().info('Subscribing on jmoab/relay [std_msgs/msg/UInt8MultiArray]')
-		self.get_logger().info('Subscribing on jmoab/servo [std_msgs/msg/UInt16MultiArry]')
-		self.get_logger().info('Subscribing on jmoab/led [std_msgs/msg/UInt8MultiArray]')
-		self.get_logger().info('There are five cart command types in auto mode')
-		self.get_logger().info('1. jmoab/cart_cmd [std_msgs/msg/UInt16MultiArray] | continuously')
-		self.get_logger().info('   ex. [sbus_steering, sbus_throttle] 368-1024-1680 as sbus range')
-		self.get_logger().info('2. jmoab/cart_rpm_cmd [std_msgs/msg/Int16MultiArray] | continuously')
+		self.get_logger().info('Publishing  to jmoab/sbus_rc_ch [std_msgs/msg/Int16MultiArray]')
+		self.get_logger().info('Publishing  to jmoab/cart_mode [std_msgs/msg/UInt8]')
+		self.get_logger().info('Publishing  to jmoab/adc [std_msgs/msg/Float32MultiArray]')
+		self.get_logger().info('Subscribing on jmoab/cart_mode_cmd [std_msgs/msg/UInt8]')
+		self.get_logger().info('Subscribing on jmoab/relay [std_msgs/msg/Int8MultiArray]')
+		self.get_logger().info('Subscribing on jmoab/servo [std_msgs/msg/Int16MultiArry]')
+		# self.get_logger().info('Subscribing on jmoab/led [std_msgs/msg/Int8MultiArray]')
+		self.get_logger().info('There are four cart command types in auto mode')
+		# self.get_logger().info('1. jmoab/cart_cmd [std_msgs/msg/Int16MultiArray] | continuously')
+		# self.get_logger().info('   ex. [sbus_steering, sbus_throttle] 368-1024-1680 as sbus range')
+		self.get_logger().info('1. jmoab/cart_rpm_cmd [std_msgs/msg/Int16MultiArray] | continuously')
 		self.get_logger().info('   ex. [rpm_left, rpm_right], -150.0 (rev) to 150.0 (fwd)')
-		self.get_logger().info('3. jmoab/cart_deg_cmd [std_msgs/msg/Int16MultiArray] | one at a time')
+		self.get_logger().info('2. jmoab/cart_deg_cmd [std_msgs/msg/Int16MultiArray] | one at a time')
 		self.get_logger().info('   ex. [deg_left, deg_right], -94M deg to 94M deg')
-		self.get_logger().info('4. jmoab/cart_dist_cmd [std_msgs/msg/Float32MultiArray] | one at a time')
+		self.get_logger().info('3. jmoab/cart_dist_cmd [std_msgs/msg/Float32MultiArray] | one at a time')
 		self.get_logger().info('   ex. [meters_left, meters_right], -171km to 171km')
-		self.get_logger().info('5. cmd_vel [geometry_msgs/msg/Twist] | continuously')
+		self.get_logger().info('4. cmd_vel [geometry_msgs/msg/Twist] | continuously')
 		self.get_logger().info('   ex. this is general cmd_vel to use with ROS navigation stack')
 		self.get_logger().info('Command types can be switched anytime depends on user publisher')
 		
@@ -209,19 +216,19 @@ class JMOAB_ATCART8(Node):
 	#######################################	
 	############ ROS callbacks ############
 	#######################################	
-	def cart_sbus_cmd_callback(self, msg):
-		if len(msg.data) > 0:
-			if (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
-				self.cmd_sbus_steering = msg.data[0]
-				self.cmd_sbus_throttle = msg.data[1]
-				self.cart_sbus_cmd_cb_timestamp = time.time()
-				self.cart_sbus_cmd_flag = True
-			else:
-				self.get_logger().warning("sbus_cmd: Try not to publish others cart command type in the same time")
+	# def cart_sbus_cmd_callback(self, msg):
+	# 	if len(msg.data) > 0:
+	# 		if (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
+	# 			self.cmd_sbus_steering = msg.data[0]
+	# 			self.cmd_sbus_throttle = msg.data[1]
+	# 			self.cart_sbus_cmd_cb_timestamp = time.time()
+	# 			self.cart_sbus_cmd_flag = True
+	# 		else:
+	# 			self.get_logger().warning("sbus_cmd: Try not to publish others cart command type in the same time")
 
 	def cart_rpm_cmd_callback(self, msg):
 		if len(msg.data) > 0:
-			if (not self.cart_sbus_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
+			if (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
 				self.cmd_rpm_left = msg.data[0]
 				self.cmd_rpm_right = -msg.data[1]
 				self.cart_rpm_cmd_cb_timestamp = time.time()
@@ -231,7 +238,7 @@ class JMOAB_ATCART8(Node):
 
 	def cart_deg_cmd_callback(self, msg):
 		if len(msg.data) > 0:
-			if (not self.cart_sbus_cmd_flag) and (not self.cart_rpm_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
+			if (not self.cart_rpm_cmd_flag) and (not self.cart_dist_cmd_flag) and (not self.cmd_vel_flag):
 				self.cmd_deg_left = msg.data[0]
 				self.cmd_deg_right = -msg.data[1]
 				self.cart_deg_cmd_cb_timestamp = time.time()
@@ -241,7 +248,7 @@ class JMOAB_ATCART8(Node):
 
 	def cart_dist_cmd_callback(self, msg):
 		if len(msg.data) > 0:
-			if (not self.cart_sbus_cmd_flag) and (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cmd_vel_flag):
+			if (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cmd_vel_flag):
 				self.cmd_dist_left = msg.data[0]
 				self.cmd_dist_right = -msg.data[1]
 				self.cart_dist_cmd_cb_timestamp = time.time()
@@ -250,7 +257,7 @@ class JMOAB_ATCART8(Node):
 				self.get_logger().warning("dist_cmd: Try not to publish others cart command type in the same time")
 
 	def cmd_vel_callback(self, msg):
-		if (not self.cart_sbus_cmd_flag) and (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag):
+		if (not self.cart_rpm_cmd_flag) and (not self.cart_deg_cmd_flag) and (not self.cart_dist_cmd_flag):
 			self.vx_cmd = msg.linear.x
 			self.wz_cmd = msg.angular.z
 			self.cmd_vel_timestamp = time.time()
@@ -355,6 +362,13 @@ class JMOAB_ATCART8(Node):
 		out = m*(val - in_min) + out_min
 		return out
 
+	def pwm2word(self, pwm_val):
+
+		high_byte = pwm_val >> 8
+		low_byte = (pwm_val & 0x00FF)
+
+		return [high_byte, low_byte]
+
 	def convert2voltage(self, raw_list):
 	
 		raw_list = np.asarray(raw_list)
@@ -365,29 +379,38 @@ class JMOAB_ATCART8(Node):
 		rpm = (60.0/(2.0*np.pi))*(v/self.R_wheel)
 		return rpm
 
+	def over_limit_check(self, pwm):
+
+		if pwm < self.pwm_min:
+			pwm  = self.pwm_min
+		elif pwm > self.pwm_max:
+			pwm = self.pwm_max
+
+		return pwm
+
 	#######################################	
 	######### SMBus2 read/write ###########
 	#######################################
 
 	def bypass_sbus_failsafe(self):
 		## Disable SBUS Failsafe
-		self.bus.write_byte_data(JMOAB_MAIN_ADDR, DISABLE_SBUS_FAILSAFE, 0x01)
+		self.bus.write_byte_data(JMOAB_I2C_ADDR2, DISABLE_SBUS_FAILSAFE, DIS_FS)
 		time.sleep(0.1)
 
 		## Set back to hold mode
-		self.write_atcart_mode(0x00)
+		self.write_atcart_mode(HOLS)
 		time.sleep(0.1)
 
 		## Set back to manual mode
-		self.write_atcart_mode(0x01)
+		self.write_atcart_mode(MAN)
 		time.sleep(0.1)
-		self.write_atcart_mode(0x01)
+		self.write_atcart_mode(MAN)
 		time.sleep(0.1)
-		self.write_atcart_mode(0x01)
+		self.write_atcart_mode(MAN)
 		time.sleep(0.1)
 
 	def read_sbus_channel(self):
-		input_SBUS = self.bus.read_i2c_block_data(JMOAB_MAIN_ADDR, IN_SBUS_CH1_H, 20)
+		input_SBUS = self.bus.read_i2c_block_data(JMOAB_I2C_ADDR2, IN_SBUS_CH1_H, 20)
 
 		SBUS_ch = [None]*10
 		for i in range(10):
@@ -399,10 +422,10 @@ class JMOAB_ATCART8(Node):
 		return SBUS_ch
 
 	def read_atcart_mode(self):
-		return self.bus.read_byte_data(JMOAB_MAIN_ADDR, CARTIF_INPUT_SELECT)
+		return self.bus.read_byte_data(JMOAB_I2C_ADDR2, CARTIF_INPUT_SELECT)
 
 	def read_adc(self):
-		raw = self.bus.read_i2c_block_data(JMOAB_MAIN_ADDR, 0x00, 6)
+		raw = self.bus.read_i2c_block_data(JMOAB_I2C_ADDR2, ADC_AC0, 6)
 		voltage_list = self.convert2voltage(raw)
 		return voltage_list
 
@@ -410,23 +433,36 @@ class JMOAB_ATCART8(Node):
 		## need to write multiple times to take effect
 		## publisher side only sends one time is ok
 		for i in range(10):
-			self.bus.write_byte_data(JMOAB_MAIN_ADDR, CARTIF_INPUT_SELECT, mode_num)
-		# self.bus.write_byte_data(JMOAB_MAIN_ADDR, CARTIF_INPUT_SELECT, mode_num)
+			self.bus.write_byte_data(JMOAB_I2C_ADDR2, CARTIF_INPUT_SELECT, mode_num)
+		# self.bus.write_byte_data(JMOAB_I2C_ADDR2, CARTIF_INPUT_SELECT, mode_num)
 
 	def write_relay(self, relay_list):
-		all_bytes = [relay_list[0], relay_list[1]]
-		self.bus.write_i2c_block_data(JMOAB_RELAY_ADDR, RY1, all_bytes)
+		all_bytes = [relay_list[1], relay_list[0]]
+		self.bus.write_i2c_block_data(JMOAB_I2C_ADDR1, RY1, all_bytes)
 
 	def write_servo(self, servo_list):
-		pwm1_bytes = self.pwm2word(servo_list[0])
-		pwm2_bytes = self.pwm2word(servo_list[1])
-		pwm3_bytes = self.pwm2word(servo_list[2])
-		all_bytes = pwm1_bytes + pwm2_bytes + pwm3_bytes
-		self.bus.write_i2c_block_data(JMOAB_MAIN_ADDR, PWM1_H, all_bytes)
 
-	def write_led(self, led_list):
-		all_bytes = [led_list[0], led_list[1], led_list[2]]
-		self.bus.write_i2c_block_data(JMOAB_MAIN_ADDR, AUX_LED1, all_bytes)
+		if len(servo_list) > 0 and len(servo_list) <= 3:
+
+			for servo_id in range(len(servo_list)):
+				cmd_pwm = servo_list[servo_id]
+				cmd_pwm = self.over_limit_check(cmd_pwm)
+				self.write_pwm_bytes(servo_id, cmd_pwm)
+
+	def write_pwm_bytes(self, servo_id, pwm):
+
+		pwm_bytes = self.pwm2word(pwm)
+
+		if servo_id == 0:
+			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM1_H, pwm_bytes)
+		elif servo_id == 1:
+			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM2_H, pwm_bytes)
+		if servo_id == 2:
+			self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, PWM3_H, pwm_bytes)
+
+	# def write_led(self, led_list):
+	# 	all_bytes = [led_list[0], led_list[1], led_list[2]]
+	# 	self.bus.write_i2c_block_data(JMOAB_I2C_ADDR2, AUX_LED1, all_bytes)
 
 	#######################################	
 	############ Cart control #############
@@ -528,37 +564,11 @@ class JMOAB_ATCART8(Node):
 		### Auto mode ####
 		if atcart_mode == 2:
 
-			###################################
-			### SBUS command mixing control ###
-			###################################
-			if self.cart_sbus_cmd_flag:
-				## confirm the mode to be in velocity control
-				self.check_zlac8015d_mode(ZLAC_VEL_MODE)
-
-				if (time.time() - self.cart_sbus_cmd_cb_timestamp) < self.cart_sbus_cmd_cb_timeout:
-					left_rpm, right_rpm = self.sbusCmds_to_RPMs(self.cmd_sbus_steering, self.cmd_sbus_throttle)
-				else:
-					left_rpm = 0.0
-					right_rpm = 0.0
-					self.cart_sbus_cmd_flag = False
-
-				self.zlac8015d_set_rpm_with_limit(left_rpm, right_rpm)
-
-				## set other flags to False if there is other command trying to come in the same time
-				self.cart_rpm_cmd_flag = False
-				self.cart_deg_cmd_flag = False
-				self.cart_dist_cmd_flag = False
-				self.cmd_vel_flag = False
-
-				## get feedback rpm from ZLAC8015D
-				fb_L_rpm, fb_R_rpm = self.zlc.get_rpm()
-				self.wheels_rpm_msg.data = [fb_L_rpm, fb_R_rpm]
-				self.wheels_rpm_pub.publish(self.wheels_rpm_msg)
 
 			####################################
 			### RPM command velocity control ###
 			####################################
-			elif self.cart_rpm_cmd_flag:
+			if self.cart_rpm_cmd_flag:
 				## confirm the mode to be in velocity control
 				self.check_zlac8015d_mode(ZLAC_VEL_MODE)
 
@@ -573,7 +583,7 @@ class JMOAB_ATCART8(Node):
 				self.zlac8015d_set_rpm_with_limit(left_rpm, right_rpm)
 
 				## set other flags to False if there is other command trying to come in the same time
-				self.cart_sbus_cmd_flag = False
+				# self.cart_sbus_cmd_flag = False
 				self.cart_deg_cmd_flag = False
 				self.cart_dist_cmd_flag = False
 				self.cmd_vel_flag = False
@@ -609,11 +619,11 @@ class JMOAB_ATCART8(Node):
 						R_icc = abs(self.vx_cmd)/abs(self.wz_cmd)
 						sign_vx = self.vx_cmd/abs(self.vx_cmd)
 						if self.wz_cmd > 0.0:
-							print("curve left")
+							# print("curve left")
 							vl_cmd = (sign_vx)*(self.wz_cmd*(R_icc - self.L/2.0))/2.0
 							vr_cmd = (sign_vx)*(self.wz_cmd*(R_icc + self.L/2.0))/2.0
 						elif self.wz_cmd < 0.0:
-							print("curve right")
+							# print("curve right")
 							vl_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc + self.L/2.0))/2.0
 							vr_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc - self.L/2.0))/2.0
 						left_rpm = self.linear_to_rpm(vl_cmd)
@@ -629,7 +639,7 @@ class JMOAB_ATCART8(Node):
 				self.zlac8015d_set_rpm_with_limit(left_rpm, right_rpm)
 
 				## set other flags to False if there is other command trying to come in the same time
-				self.cart_sbus_cmd_flag = False
+				# self.cart_sbus_cmd_flag = False
 				self.cart_rpm_cmd_flag = False
 				self.cart_deg_cmd_flag = False
 				self.cart_dist_cmd_flag = False
@@ -652,7 +662,7 @@ class JMOAB_ATCART8(Node):
 				left_rpm = 0.0
 				right_rpm = 0.0
 				## set other flags to False if there is other command trying to come in the same time
-				self.cart_sbus_cmd_flag = False
+				# self.cart_sbus_cmd_flag = False
 				self.cart_rpm_cmd_flag = False
 				self.cart_dist_cmd_flag = False
 				self.cmd_vel_flag = False
@@ -673,7 +683,7 @@ class JMOAB_ATCART8(Node):
 				left_rpm = 0.0
 				right_rpm = 0.0
 				## set other flags to False if there is other command trying to come in the same time
-				self.cart_sbus_cmd_flag = False
+				# self.cart_sbus_cmd_flag = False
 				self.cart_rpm_cmd_flag = False
 				self.cart_deg_cmd_flag = False
 				self.cmd_vel_flag = False
