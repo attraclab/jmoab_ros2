@@ -55,6 +55,8 @@ class JMOAB_ATCART_BASIC(Node):
 		self.declare_parameter('vx_max', 2.0)
 		self.declare_parameter('wz_max', 2.0)
 
+		self.declare_parameter('show_log', False)
+
 		self.add_on_set_parameters_callback(self.parameter_callback)
 
 		self.sbus_left_max_db = self.get_parameter('sbus_left_max_db').get_parameter_value().integer_value
@@ -63,6 +65,7 @@ class JMOAB_ATCART_BASIC(Node):
 		self.sbus_right_min_db = self.get_parameter('sbus_right_min_db').get_parameter_value().integer_value
 		self.vx_max = self.get_parameter('vx_max').get_parameter_value().double_value
 		self.wz_max = self.get_parameter('wz_max').get_parameter_value().double_value
+		self.show_log = self.get_parameter('show_log').get_parameter_value().bool_value
 
 		self.get_logger().info("Using parameters as below")
 		self.get_logger().info("sbus_left_max_db: {}".format(self.sbus_left_max_db))
@@ -71,6 +74,7 @@ class JMOAB_ATCART_BASIC(Node):
 		self.get_logger().info("sbus_right_min_db: {}".format(self.sbus_right_min_db))
 		self.get_logger().info("vx_max: {}".format(self.vx_max))
 		self.get_logger().info("wz_max: {}".format(self.wz_max))
+		self.get_logger().info("show_log: {}".format(self.show_log))
 
 		### Class parameters ###
 		#### cart_cmd
@@ -131,19 +135,19 @@ class JMOAB_ATCART_BASIC(Node):
 		self.led_list = []
 
 		### Pub/Sub ###
-		self.sbus_rc_pub = self.create_publisher(Int16MultiArray, 'jmoab/sbus_rc_ch', 10)
-		self.cart_mode_pub = self.create_publisher(UInt8, 'jmoab/cart_mode', 10)
-		self.adc_pub = self.create_publisher(Float32MultiArray, 'jmoab/adc', 10)
+		self.sbus_rc_pub = self.create_publisher(Int16MultiArray, '/jmoab/sbus_rc_ch', 10)
+		self.cart_mode_pub = self.create_publisher(UInt8, '/jmoab/cart_mode', 10)
+		self.adc_pub = self.create_publisher(Float32MultiArray, '/jmoab/adc', 10)
 
 		self.sbus_rc_msg = Int16MultiArray()
 		self.cart_mode_msg = UInt8()
 		self.adc_msg = Float32MultiArray()
 
-		self.wheels_cmd_sub = self.create_subscription(Float32MultiArray, 'jmoab/wheels_cmd', self.wheels_cmd_callback, 10)
-		self.cmd_vel_sub = self.create_subscription(Twist, 'cmd_vel', self.cmd_vel_callback, 10)
-		self.cart_mode_cmd_sub = self.create_subscription(UInt8, 'jmoab/cart_mode_cmd', self.cart_mode_cmd_callback, 10)
-		self.relay_sub = self.create_subscription(Int8MultiArray, 'jmoab/relays', self.relay_cmd_callback, 10)
-		self.servo_sub = self.create_subscription(Int16MultiArray, 'jmoab/servos', self.servo_cmd_callback, 10)
+		self.wheels_cmd_sub = self.create_subscription(Float32MultiArray, '/jmoab/wheels_cmd', self.wheels_cmd_callback, 10)
+		self.cmd_vel_sub = self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_callback, 10)
+		self.cart_mode_cmd_sub = self.create_subscription(UInt8, '/jmoab/cart_mode_cmd', self.cart_mode_cmd_callback, 10)
+		self.relay_sub = self.create_subscription(Int8MultiArray, '/jmoab/relays', self.relay_cmd_callback, 10)
+		self.servo_sub = self.create_subscription(Int16MultiArray, '/jmoab/servos', self.servo_cmd_callback, 10)
 		# self.led_sub = self.create_subscription(UInt8MultiArray, 'jmoab/led', self.led_cmd_callback, 10)
 
 		self.get_logger().info('Publishing  to /jmoab/sbus_rc_ch [std_msgs/msg/Int16MultiArray]')
@@ -182,6 +186,8 @@ class JMOAB_ATCART_BASIC(Node):
 				self.vx_max = param.value
 			elif (param.name == 'wz_max') and (param.type_ == Parameter.Type.DOUBLE):
 				self.wz_max = param.value
+			elif (param.name == 'show_log') and (param.type_ == Parameter.Type.BOOL):
+				self.show_log = param.value
 
 		self.get_logger().info("Updated parameter")
 
@@ -502,19 +508,28 @@ class JMOAB_ATCART_BASIC(Node):
 				x_percent = 0.0
 				y_percent = 0.0
 
-			if time.time() - self.last_stamp_log > 1.0:
-				self.get_logger().info("vx: {:.2f} wz: {:.2f} left: {:.2f} right: {:.2f} x: {:.2f} y: {:.2f} l_sbus: {:d} r_sbus: {:d}".format(\
-					self.vx, self.wz, self.left_percent, self.right_percent, x_percent, y_percent, int(left_sbus), int(right_sbus)))
-				self.last_stamp_log = time.time()
-
 
 		elif atcart_mode == 0:
 			self.write_left_right(1024, 1024)
 			self.cmd_vel_cb_flag = False
 			self.wheels_cmd_cb_flag = False
-			self.last_stamp_log = time.time()
+			# self.last_stamp_log = time.time()
+			left_sbus = 1024
+			right_sbus = 1024
+			x_percent = 0.0
+			y_percent = 0.0
 
 		else:
+			# self.last_stamp_log = time.time()
+			left_sbus = 1024
+			right_sbus = 1024
+			x_percent = 0.0
+			y_percent = 0.0
+
+
+		if (time.time() - self.last_stamp_log > 1.0) and self.show_log:
+			self.get_logger().info("mode: {:d} vx: {:.2f} wz: {:.2f} left: {:.2f} right: {:.2f} x: {:.2f} y: {:.2f} l_sbus: {:d} r_sbus: {:d}".format(\
+				atcart_mode, self.vx, self.wz, self.left_percent, self.right_percent, x_percent, y_percent, int(left_sbus), int(right_sbus)))
 			self.last_stamp_log = time.time()
 
 		#########################

@@ -28,7 +28,9 @@ setup(
         'atcart_basic = jmoab_ros2.atcart_basic:main',
         'bno055 = jmoab_ros2.bno055:main',
         'atcart8 = jmoab_ros2.atcart8:main',
-        'pwmcart = jmoab_ros2.pwmcart:main'
+        'pwmcart = jmoab_ros2.pwmcart:main',
+        'atcart_basic_sim = jmoab_ros2.atcart_basic_sim:main',
+        'ahrs_sim = jmoab_ros2.ahrs_sim:main',
         ],
     },
 )
