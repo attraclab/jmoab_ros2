@@ -1,11 +1,11 @@
 jmoab_ros2_pwmcart:
   ros__parameters:
 
-    sbus_left_max_db: 1142
-    sbus_right_max_db: 1151
+    sbus_left_max_db: 1160 #1142
+    sbus_right_max_db: 1100 #1151 #1151
 
-    sbus_left_min_db: 908
-    sbus_right_min_db: 902
+    sbus_left_min_db: 879 #908
+    sbus_right_min_db: 980 #892 #902
     
     ## velocities limit
     vx_max: 2.0

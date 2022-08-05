@@ -2,13 +2,15 @@
 import rclpy
 from rclpy.node import Node
 from ament_index_python.packages import get_package_share_directory
-from std_msgs.msg import Float32MultiArray, UInt16MultiArray, UInt8
+from std_msgs.msg import Float32MultiArray, Int16MultiArray, UInt8
 from sensor_msgs.msg import Imu, NavSatFix
 import time
 import numpy as np
 from smbus2 import SMBus
 import os
 import struct
+from rclpy.parameter import Parameter
+from rcl_interfaces.msg import SetParametersResult
 
 ## BNO055 address
 IMU_ADDR = 0x28
@@ -73,6 +75,14 @@ class JMOAB_BNO055(Node):
 		super().__init__('jmoab_ros2_bno055')
 		self.get_logger().info('Start JMOAB BNO055 node')
 
+		self.declare_parameter('show_log', False)
+		self.add_on_set_parameters_callback(self.parameter_callback)
+		self.show_log = self.get_parameter('show_log').get_parameter_value().bool_value
+
+		self.get_logger().info("Using parameters as below")
+		self.get_logger().info("show_log: {}".format(self.show_log))
+
+
 		self.bus = SMBus(1)
 
 		### Get ros2 pacakage path ###
@@ -114,6 +124,7 @@ class JMOAB_BNO055(Node):
 		self.last_time_auto_cal = time.time()
 		self.cal_offset = False
 		self.do_estimation = False
+		self.last_log_stamp = time.time()
 
 
 		### Kalman filter of hdg_offset estimate ###
@@ -130,7 +141,7 @@ class JMOAB_BNO055(Node):
 		self.imu_msg = Imu()
 
 		self.gps_sub = self.create_subscription(NavSatFix, '/fix', self.gps_callback, 10)
-		self.sbus_rc_ch_sub = self.create_subscription(UInt16MultiArray, 'jmoab/sbus_rc_ch', self.sbus_rc_callback, 10)
+		self.sbus_rc_ch_sub = self.create_subscription(Int16MultiArray, 'jmoab/sbus_rc_ch', self.sbus_rc_callback, 10)
 		self.cart_mode_sub = self.create_subscription(UInt8, 'jmoab/cart_mode', self.cart_mode_callback, 10)
 		# self.cart_cmd_sub = self.create_subscription(UInt16MultiArray, 'jmoab/cart_cmd', self.cart_cmd_callback, 10)
 		
@@ -148,6 +159,16 @@ class JMOAB_BNO055(Node):
 	# 	self.sbus_cmd_steering = msg.data[0]
 	# 	self.sbus_cmd_throttle = msg.data[1]
 
+	def parameter_callback(self, params):
+		for param in params:
+			# print(param.name, param.type_)
+			if (param.name == 'show_log') and (param.type_ == Parameter.Type.BOOL):
+				self.show_log = param.value
+
+		self.get_logger().info("Updated parameter")
+
+		return SetParametersResult(successful=True)	
+
 	def sbus_rc_callback(self, msg):
 		self.sbus_steering_stick = msg.data[0]
 		self.sbus_throttle_stick = msg.data[1]
@@ -156,8 +177,13 @@ class JMOAB_BNO055(Node):
 		self.cart_mode = msg.data
 
 	def gps_callback(self, msg):
-		self.prev_lat = self.lat
-		self.prev_lon = self.lon
+
+		if msg.latitude != self.lat:
+			self.prev_lat = self.lat
+
+		if msg.longitude != self.lon:
+			self.prev_lon = self.lon
+
 		self.lat = msg.latitude
 		self.lon = msg.longitude
 		self.fix_stat = msg.status.status
@@ -406,7 +432,7 @@ class JMOAB_BNO055(Node):
 		self.pure_hdg = self.ConvertTo360Range(ahrs[2])
 		hdg = self.ConvertTo360Range(self.pure_hdg + (self.sign)*self.hdg_off_est)
 		#### must be rtk-fixed, to get precise position
-		if self.fix_stat == 2:
+		if self.fix_stat != 0:
 
 			## in manual case
 			if self.cart_mode == 1:
@@ -465,6 +491,11 @@ class JMOAB_BNO055(Node):
 
 		self.imu_pub.publish(self.imu_msg)
 		self.ahrs_pub.publish(self.ahrs_msg)
+
+		if ((time.time() - self.last_log_stamp) > 1.0) and self.show_log:
+			self.get_logger().info("p_hdg: {:.2f} hdg_off_est: {:.2f} brg: {:.2f} hdg: {:.2f} KF_cal: {}".format(\
+				self.pure_hdg, self.hdg_off_est, self.brg, hdg, self.cal_offset))
+			self.last_log_stamp = time.time()
 
 		period = time.time() - startTime
 		if period < 0.007:

@@ -620,12 +620,12 @@ class JMOAB_ATCART8(Node):
 						sign_vx = self.vx_cmd/abs(self.vx_cmd)
 						if self.wz_cmd > 0.0:
 							# print("curve left")
-							vl_cmd = (sign_vx)*(self.wz_cmd*(R_icc - self.L/2.0))/2.0
-							vr_cmd = (sign_vx)*(self.wz_cmd*(R_icc + self.L/2.0))/2.0
+							vl_cmd = (sign_vx)*(self.wz_cmd*(R_icc - self.L/2.0)) #/2.0
+							vr_cmd = (sign_vx)*(self.wz_cmd*(R_icc + self.L/2.0)) #/2.0
 						elif self.wz_cmd < 0.0:
 							# print("curve right")
-							vl_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc + self.L/2.0))/2.0
-							vr_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc - self.L/2.0))/2.0
+							vl_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc + self.L/2.0)) #/2.0
+							vr_cmd = (sign_vx)*(abs(self.wz_cmd)*(R_icc - self.L/2.0)) #/2.0
 						left_rpm = self.linear_to_rpm(vl_cmd)
 						right_rpm = self.linear_to_rpm(-vr_cmd)
 					else:
@@ -780,6 +780,9 @@ class JMOAB_ATCART8(Node):
 			V = 0.0
 			Wz = 0.0
 			R_ICC = 0.0
+
+		vx_odom = V*np.cos(self.theta)
+		vy_odom = V*np.sin(self.theta)
 			
 		q = quaternion_from_euler(0,0, self.theta)
 		## construct tf
@@ -813,8 +816,8 @@ class JMOAB_ATCART8(Node):
 		self.odom_msg.pose.covariance[21] = 0.000001	#1e12
 		self.odom_msg.pose.covariance[28] = 0.000001	#1e12
 		self.odom_msg.pose.covariance[35] = 0.0001
-		self.odom_msg.twist.twist.linear.x = V
-		self.odom_msg.twist.twist.linear.y = 0.0
+		self.odom_msg.twist.twist.linear.x = V #vx_odom #V
+		self.odom_msg.twist.twist.linear.y = 0.0 #vy_odom #0.0
 		self.odom_msg.twist.twist.angular.z = Wz
 		self.odom_pub.publish(self.odom_msg)
 
