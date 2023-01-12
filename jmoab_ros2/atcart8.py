@@ -398,7 +398,7 @@ class JMOAB_ATCART8(Node):
 		time.sleep(0.1)
 
 		## Set back to hold mode
-		self.write_atcart_mode(HOLS)
+		self.write_atcart_mode(HOLD)
 		time.sleep(0.1)
 
 		## Set back to manual mode

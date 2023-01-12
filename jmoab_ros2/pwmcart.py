@@ -147,7 +147,7 @@ class JMOAB_ATCART_BASIC(Node):
 		self.cmd_vel_sub = self.create_subscription(Twist, '/cmd_vel', self.cmd_vel_callback, 10)
 		self.cart_mode_cmd_sub = self.create_subscription(UInt8, '/jmoab/cart_mode_cmd', self.cart_mode_cmd_callback, 10)
 		self.relay_sub = self.create_subscription(Int8MultiArray, '/jmoab/relays', self.relay_cmd_callback, 10)
-		self.servo_sub = self.create_subscription(Int16MultiArray, '/jmoab/servos', self.servo_cmd_callback, 10)
+		self.servo_sub = self.create_subscription(Int16, '/jmoab/servos', self.servo_cmd_callback, 10)
 		# self.led_sub = self.create_subscription(UInt8MultiArray, 'jmoab/led', self.led_cmd_callback, 10)
 
 		self.get_logger().info('Publishing  to /jmoab/sbus_rc_ch [std_msgs/msg/Int16MultiArray]')
