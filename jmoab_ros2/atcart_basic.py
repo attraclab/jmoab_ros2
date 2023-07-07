@@ -282,7 +282,7 @@ class JMOAB_ATCART_BASIC(Node):
 		# self.bus.write_byte_data(JMOAB_I2C_ADDR2, CARTIF_INPUT_SELECT, mode_num)
 
 	def write_relay(self, relay_list):
-		all_bytes = [relay_list[1], relay_list[0]]
+		all_bytes = [relay_list[0], relay_list[1]]
 		self.bus.write_i2c_block_data(JMOAB_I2C_ADDR1, RY1, all_bytes)
 
 	def write_servo(self, servo_list):
