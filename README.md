@@ -4,6 +4,13 @@ JMOAB package for ROS2. This package is based on [jmoab-ros](https://github.com/
 
 ![](images/jmoab1.jpg)
 
+## Jetson Nano with ROS2
+In order to run ROS2 on Jetson Nano, at the current time there is no official support from NVIDIA for Ubuntu 20.04 which requires for ROS2, there is a docker support for ROS2, but I am not familiar with docker and I prefer to build ROS/ROS2 directly to my filesystem. There are two ways to have Ubuntu 20.04 on Jetson Nano
+
+1. From [Qengineering](https://github.com/Qengineering/Jetson-Nano-Ubuntu-20-image) custom image, this you will have CUDA installed already, so recommended for the future of AI integration.
+
+2. From [mr.chrismitchells Xubuntu](https://forums.developer.nvidia.com/t/xubuntu-20-04-focal-fossa-l4t-r32-3-1-custom-image-for-the-jetson-nano/121768) custom image, I have tried with this one, it's working fine, but I noticed that USB3.0 speed got missed, so if you are planning to use high speed USB for some device, you will only get USB2.0 speed instead. And you will need to install CUDA by yourself.
+
 ## Dependencies
 
 - ros2 debian packages, install from [here](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html).
