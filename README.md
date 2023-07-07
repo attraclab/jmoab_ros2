@@ -11,20 +11,6 @@ In order to run ROS2 on Jetson Nano, at the current time there is no official su
 
 2. From [mr.chrismitchells Xubuntu](https://forums.developer.nvidia.com/t/xubuntu-20-04-focal-fossa-l4t-r32-3-1-custom-image-for-the-jetson-nano/121768) custom image, I have tried with this one, it's working fine, but I noticed that USB3.0 speed got missed, so if you are planning to use high speed USB for some device, you will only get USB2.0 speed instead. And you will need to install CUDA by yourself.
 
-## Dependencies
-
-- ros2 debian packages, install from [here](https://docs.ros.org/en/foxy/Installation/Ubuntu-Install-Debians.html).
-- `sudo pip3 install smbus2`
-- `sudo apt install ros-$ROSDISTRO-tf-transformations`
-- `sudo pip3 install transforms3d`
-- `sudo pip3 install numpy`
-
-Make sure to source all ros environment setup files.
-
-`source /opt/ros/foxy/setup.bash` for Foxy.
-
-`source ~/dev_ws/install/local_setup.bash` for local workspace name `dev_ws`.
-
 ## Update JMOAB firmware
 
 All of available firmware are in [firmwares](./firmwares/) directory.
@@ -47,6 +33,46 @@ To flash the firmware, please follow the step below, (must use Windows PC)
 ![](images/flash_success.jpeg)
 
 - You will need to power off and on the Jetson again to take affect of new firmware on JMOAB.
+
+## Dependencies
+
+- ros2 debian packages, install from [here](https://docs.ros.org/en/galactic/Installation/Ubuntu-Install-Debians.html).
+- `sudo pip3 install smbus2`
+- `sudo apt install ros-$ROSDISTRO-tf-transformations`
+- `sudo pip3 install transforms3d`
+- `sudo pip3 install numpy`
+- `sudo apt install python3-colcon-common-extensions`, to build package in workspace
+
+## Install jmoab_ros2 package
+
+Assume you have the ros2 workspace called `dev_ws` at home directory.
+
+```sh
+cd ~/dev_ws/src
+
+git clone https://github.com/attraclab/jmoab_ros2.git
+
+cd ..
+
+colcon build --symlink-install --packages-select jmoab_ros2
+
+```
+
+Make sure to source all ros environment setup files.
+
+`source /opt/ros/galactic/setup.bash` for Galactic.
+
+`source ~/dev_ws/install/local_setup.bash` for local workspace name `dev_ws`.
+
+`export ROS_DOMAIN_ID=1`, this will allow all the ROS2 node in network with the same ID could see each other.
+
+or put it in `~/.bashrc` file as below
+
+```sh
+source /opt/ros/galactic/setup.bash
+source ~/dev_ws/install/local_setup.bash
+export ROS_DOMAIN_ID=1
+```
 
 ## JMOAB atcart_basic
 
