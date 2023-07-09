@@ -159,9 +159,13 @@ Then you just run
 - `/jmoab/relays` as std_msgs/msg/Int8MultiArray, you can control relays ON/OFF; ex. [1,0] relay1 on relay2 off.
 - `/jmoab/servo` as std_msgs/msg/Int16, you can control only one servo motor by pwm value; ex. in 1120-1520-1920 ranges.
 
-### Tips
+### TODO
 
-It is necessary to know that how much of lowest speed each left/right motors can spin. So you can try to publish `/jmoab/wheels_cmd` little by little, for example,
+It is necessary to know that how much of lowest speed each left/right motors can spin, or in the other meaning we need to know the minimum and maximum of dead band value which makes the wheels start to spin. An ideal is 1024 SBUS value is to stop the motor, and 1025 would make it run forward, and 1023 would be it run backward in very slow speed. But technically things are not perfect like that, there is a dead band of +/- from 1024 which make the wheels to stop. We have to find these dead band first in order to control the motor correctly in future application.
+
+![](images/pwmcart_sbus_db.png)
+
+After `pwmcart` node is running, then you can try to publish `/jmoab/wheels_cmd` little by little, for example,
 
 `ros2 topic pub /jmoab/wheels_cmd std_msgs/msg/Float32MultiArray "data: [10.0, 10.0]"`
 
@@ -177,7 +181,7 @@ On `pwmcart` node termnial you will see log info every 1 second printing
 
 ```  
 
-so observe that at which `/jmoab/wheels_cmd` value the wheels are almost not moving at all, left and right could be different values as well. Then check on `l_sbus` and `r_sbus` which printing out, so that is the upper deadband where the motors could start to spin forward.
+so observe that at which `/jmoab/wheels_cmd` value the wheels stop moving but seems to start moving, left and right could be different values as well. Then check on `l_sbus` and `r_sbus` which printing out, so that is the upper deadband where the motors could start to spin forward.
 
 Then put those value into the parameters file at [config/pwmcart_params.yaml](https://github.com/attraclab/jmoab_ros2/blob/master/config/pwmcart_params.yaml), at `sbus_left_max_db` and `sbus_right_max_db`.
 
