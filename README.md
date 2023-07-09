@@ -141,10 +141,6 @@ Similar to ATCart it could have other peripherals control, but instead of ATCart
 
 ![](images/pwmcart.jpg)
 
-Then you just run
-
-`ros2 run jmoab_ros2 pwmcart`
-
 ### publish
 
 - `/jmoab/sbus_rc_ch` as std_msgs/msg/Int16MultiArray, sbus value of RC transmitter's channels
@@ -165,13 +161,21 @@ It is necessary to know that how much of lowest speed each left/right motors can
 
 ![](images/pwmcart_sbus_db.png)
 
+First start `pwmcart` node as below
+
+```
+ros2 run jmoab_ros2 pwmcart --ros-args -p show_log:=True
+```
+
+It will be showing log every 1 seconds.
+
 After `pwmcart` node is running, then you can try to publish `/jmoab/wheels_cmd` little by little, for example,
 
 `ros2 topic pub /jmoab/wheels_cmd std_msgs/msg/Float32MultiArray "data: [10.0, 10.0]"`
 
 Then from RC transmitter (ch.5) switch to auto mode.
 
-On `pwmcart` node termnial you will see log info every 1 second printing
+On `pwmcart` node termnial you will see log info as following,
 
 ```
 [INFO] [1659088017.413651126] [jmoab_ros2_pwmcart]: vx: 0.00 wz: 0.00 left: 0.00 right: 0.00 x: 0.00 y: 0.00 l_sbus: 1024 r_sbus: 1024
